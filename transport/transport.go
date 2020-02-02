@@ -11,3 +11,10 @@ type Business interface {
 	AddNewRecipe(models.Recipe) (models.Recipe, error)
 	UpdateRecipe(models.Recipe) (models.Recipe, error)
 }
+
+// Transport is the interface that defines the methods
+// the transport layer for the service should implement
+type Transport interface {
+	// Start starts listening for requests from clients
+	Start(map[string]string) error
+}
