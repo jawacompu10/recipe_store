@@ -7,7 +7,7 @@ import (
 // Business is the interface that defines the methods
 // the business layer of the service should implement
 type Business interface {
-	GetRecipe(itemName string) (models.Recipe, error)
+	GetRecipe(string) (models.Recipe, error)
 	AddNewRecipe(models.Recipe) (models.Recipe, error)
 	UpdateRecipe(models.Recipe) (models.Recipe, error)
 }
