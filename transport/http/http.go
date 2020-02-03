@@ -2,6 +2,7 @@ package http
 
 import (
 	"encoding/json"
+	"log"
 	"net/http"
 
 	"github.com/gorilla/mux"
@@ -23,24 +24,36 @@ func New(business transport.Business) transport.Transport {
 // Start starts listening to requests
 func (ht *Transport) Start(opts map[string]string) error {
 	r := ht.buildRouter()
-	return http.ListenAndServe(":8080", r)
+	port := ":8080"
+	if port, ok := opts["port"]; ok {
+		port = ":" + port
+	}
+	log.Println("recipe_store: Starting to listen on", port)
+	return http.ListenAndServe(port, r)
 }
 
 func (ht *Transport) buildRouter() *mux.Router {
 	r := mux.NewRouter()
 	r.HandleFunc("/recipe/{item}", ht.GetRecipe).Methods("GET")
+	r.HandleFunc("/recipe/{id}", ht.UpdateRecipe).Methods("PUT")
+	r.HandleFunc("/recipe", ht.AddNewRecipe).Methods("POST")
+
+	r.Use(addContentTypeJSON)
 
 	return r
 }
 
+func addContentTypeJSON(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		w.Header().Add("Content-Type", "application/json")
+		next.ServeHTTP(w, req)
+	})
+}
+
 // GetRecipe returns a recipe for the given item
 func (ht *Transport) GetRecipe(w http.ResponseWriter, req *http.Request) {
-	var item string
-	var ok bool
-	if item, ok = mux.Vars(req)["item"]; !ok {
-		http.Error(w, "Specify a valid item", http.StatusBadRequest)
-		return
-	}
+	item := mux.Vars(req)["item"]
+	log.Println("GetRecipe request. Item: ", item)
 	recipe, err := ht.business.GetRecipe(item)
 	if err != nil {
 		http.Error(w, err.Error(), getStatusCode(err))
@@ -51,13 +64,17 @@ func (ht *Transport) GetRecipe(w http.ResponseWriter, req *http.Request) {
 
 // AddNewRecipe adds a new recipe
 func (ht *Transport) AddNewRecipe(w http.ResponseWriter, req *http.Request) {
+	log.Println("AddNewRecipe request")
 	recipe, err := decodeRecipeFromJSON(req.Body)
 	if err != nil {
+		log.Println("Failed to decode JSON")
 		http.Error(w, "Invalid request:"+err.Error(), http.StatusBadRequest)
 		return
 	}
+	log.Printf("Request body: %+v\n", recipe)
 	recipe, err = ht.business.AddNewRecipe(recipe)
 	if err != nil {
+		log.Println("Failed to add new recipe: ", err)
 		http.Error(w, err.Error(), getStatusCode(err))
 		return
 	}
@@ -66,13 +83,20 @@ func (ht *Transport) AddNewRecipe(w http.ResponseWriter, req *http.Request) {
 
 // UpdateRecipe adds a new recipe
 func (ht *Transport) UpdateRecipe(w http.ResponseWriter, req *http.Request) {
+	id := mux.Vars(req)["id"]
+	log.Println("UpdateRecipe request. Id: ", id)
 	recipe, err := decodeRecipeFromJSON(req.Body)
 	if err != nil {
+		log.Println("Failed to decode JSON")
 		http.Error(w, "Invalid request:"+err.Error(), http.StatusBadRequest)
 		return
 	}
+	log.Printf("Request body: %+v\n", recipe)
+	log.Println("Request recipe ID:", id)
+	recipe.ID = id
 	recipe, err = ht.business.UpdateRecipe(recipe)
 	if err != nil {
+		log.Println("Failed to update recipe: ", err)
 		http.Error(w, err.Error(), getStatusCode(err))
 		return
 	}
